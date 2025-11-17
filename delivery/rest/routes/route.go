@@ -1,0 +1,20 @@
+package routes
+
+import (
+	"post-management/delivery/rest/handler"
+
+	"github.com/go-chi/chi/v5"
+)
+
+type Router struct {
+	Router      *chi.Mux
+	PostHandler *handler.PostHandler
+}
+
+func (r *Router) New() {
+	r.Router.Route("/api", func(api chi.Router) {
+		api.Route("/posts", func(posts chi.Router) {
+			posts.Post("/", r.PostHandler.PostCreate)
+		})
+	})
+}

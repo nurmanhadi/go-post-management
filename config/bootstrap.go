@@ -1,6 +1,12 @@
 package config
 
 import (
+	"post-management/delivery/rest/handler"
+	"post-management/delivery/rest/middleware"
+	"post-management/delivery/rest/routes"
+	"post-management/internal/repository"
+	"post-management/internal/service"
+
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
@@ -24,14 +30,23 @@ func Initialize(deps *Bootstrap) {
 	// cache
 
 	// repository
+	postRepo := repository.NewPostRepository(deps.DB)
 
 	// service
+	postServ := service.NewPostService(deps.Logger, deps.Validator, postRepo)
 
 	// handler
+	postHand := handler.NewPostHandler(postServ)
 
 	// middleware
+	deps.Router.Use(middleware.ErrorHandler)
 
 	// routes
+	r := routes.Router{
+		Router:      deps.Router,
+		PostHandler: postHand,
+	}
+	r.New()
 
 	// subcriber
 }

@@ -8,5 +8,5 @@ import (
 
 func NewLogger() zerolog.Logger {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	return zerolog.New(os.Stderr).With().Str("service", "user management").Timestamp().Logger()
+	return zerolog.New(os.Stderr).With().Str("service", "post management").Timestamp().Logger()
 }
