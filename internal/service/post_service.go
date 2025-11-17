@@ -78,3 +78,41 @@ func (s *PostService) PostUpdate(id string, request *dto.PostUpdateRequest) erro
 	s.logger.Info().Str("post_id", id).Msg("post create success")
 	return nil
 }
+func (s *PostService) PostGetById(id string) (*dto.PostResponse, error) {
+	newId, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("failed parse string to int64")
+		return nil, err
+	}
+	post, err := s.postRepository.FindById(newId)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			s.logger.Warn().Err(err).Msg("post not found")
+			return nil, response.Except(http.StatusNotFound, "post not found")
+		}
+		s.logger.Error().Err(err).Msg("failed find by id to database")
+		return nil, err
+	}
+	user, err := api.UserGetById(post.UserId)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("failed get by id to user service")
+		return nil, err
+	}
+	resp := &dto.PostResponse{
+		Id:          post.Id,
+		Description: post.Description,
+		User: dto.UserResponse{
+			Id:       user.Id,
+			Username: user.Username,
+			Name: dto.UserNameInfo{
+				FirstName: user.Name.FirstName,
+				Lastname:  user.Name.Lastname,
+			},
+			AvatarUrl: user.AvatarUrl,
+		},
+		CreatedAt: post.CreatedAt,
+		UpdatedAt: post.UpdatedAt,
+	}
+	s.logger.Info().Str("post_id", id).Msg("post create success")
+	return resp, nil
+}

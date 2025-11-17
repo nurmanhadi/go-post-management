@@ -15,6 +15,8 @@ func (r *Router) New() {
 	r.Router.Route("/api", func(api chi.Router) {
 		api.Route("/posts", func(posts chi.Router) {
 			posts.Post("/", r.PostHandler.PostCreate)
+			posts.Put("/{id}", r.PostHandler.PostUpdate)
+			posts.Get("/{id}", r.PostHandler.PostGetById)
 		})
 	})
 }

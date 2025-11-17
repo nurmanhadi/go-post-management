@@ -29,3 +29,23 @@ func (h *PostHandler) PostCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	response.Success(w, 201, "OK", r.URL.Path)
 }
+func (h *PostHandler) PostUpdate(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	request := new(dto.PostUpdateRequest)
+	if err := json.NewDecoder(r.Body).Decode(request); err != nil {
+		panic(response.Except(400, "failed to parse json"))
+	}
+	err := h.postService.PostUpdate(id, request)
+	if err != nil {
+		panic(err)
+	}
+	response.Success(w, 200, "OK", r.URL.Path)
+}
+func (h *PostHandler) PostGetById(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	result, err := h.postService.PostGetById(id)
+	if err != nil {
+		panic(err)
+	}
+	response.Success(w, 200, result, r.URL.Path)
+}
