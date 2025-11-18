@@ -26,3 +26,14 @@ func (r *PostRepository) FindById(id int64) (*entity.Post, error) {
 	}
 	return post, nil
 }
+func (r *PostRepository) Delete(id int64) error {
+	return r.db.Where("id = ?", id).Delete(&entity.Post{}).Error
+}
+func (r *PostRepository) CountById(id int64) (int64, error) {
+	var count int64
+	err := r.db.Model(&entity.Post{}).Where("id = ?", id).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}

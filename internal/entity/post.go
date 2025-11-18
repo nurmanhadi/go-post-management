@@ -8,4 +8,5 @@ type Post struct {
 	Description string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	Likes       []Like
 }

@@ -49,3 +49,30 @@ func (h *PostHandler) PostGetById(w http.ResponseWriter, r *http.Request) {
 	}
 	response.Success(w, 200, result, r.URL.Path)
 }
+func (h *PostHandler) PostDelete(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	err := h.postService.PostDelete(id)
+	if err != nil {
+		panic(err)
+	}
+	response.Success(w, 200, "OK", r.URL.Path)
+}
+func (h *PostHandler) PostLike(w http.ResponseWriter, r *http.Request) {
+	request := new(dto.LikeAddRequest)
+	if err := json.NewDecoder(r.Body).Decode(request); err != nil {
+		panic(response.Except(400, "failed to parse json"))
+	}
+	err := h.postService.PostLike(request)
+	if err != nil {
+		panic(err)
+	}
+	response.Success(w, 201, "OK", r.URL.Path)
+}
+func (h *PostHandler) PostUnlike(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	err := h.postService.PostUnlike(id)
+	if err != nil {
+		panic(err)
+	}
+	response.Success(w, 200, "OK", r.URL.Path)
+}
