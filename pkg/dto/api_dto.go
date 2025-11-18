@@ -18,3 +18,6 @@ type ApiUserNameInfoPayload struct {
 	FirstName *string `json:"first_name"`
 	Lastname  *string `json:"last_name"`
 }
+type ApiUserGetBySliceIdBody struct {
+	Ids []int64 `json:"ids"`
+}

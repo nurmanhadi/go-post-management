@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"os"
@@ -46,4 +47,35 @@ func UserGetById(id int64) (*dto.ApiUserPayload, error) {
 		return nil, fmt.Errorf("code: %d, msg: %s", resp.StatusCode, *body.Error)
 	}
 	return body.Data, nil
+}
+func UserGetBySliceId(data *dto.ApiUserGetBySliceIdBody) ([]dto.ApiUserPayload, error) {
+	url := fmt.Sprintf("%s/api/users/services/ids",
+		os.Getenv("API_USER"),
+	)
+	newData, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(newData))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// kirim request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body := new(dto.ApiWebPayload[[]dto.ApiUserPayload])
+	err = json.NewDecoder(resp.Body).Decode(body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("code: %d, msg: %s", resp.StatusCode, *body.Error)
+	}
+	return *body.Data, nil
 }

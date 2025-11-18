@@ -4,6 +4,7 @@ import (
 	"post-management/delivery/rest/handler"
 	"post-management/delivery/rest/middleware"
 	"post-management/delivery/rest/routes"
+	"post-management/internal/cache"
 	"post-management/internal/repository"
 	"post-management/internal/service"
 
@@ -28,6 +29,7 @@ func Initialize(deps *Bootstrap) {
 	// publisher
 
 	// cache
+	postCache := cache.NewPostCache(deps.Cache)
 
 	// repository
 	postRepo := repository.NewPostRepository(deps.DB)
@@ -35,7 +37,7 @@ func Initialize(deps *Bootstrap) {
 	commentRepo := repository.NewCommentRepository(deps.DB)
 
 	// service
-	postServ := service.NewPostService(deps.Logger, deps.Validator, postRepo, likeRepo, commentRepo)
+	postServ := service.NewPostService(deps.Logger, deps.Validator, postRepo, likeRepo, commentRepo, postCache)
 
 	// handler
 	postHand := handler.NewPostHandler(postServ)

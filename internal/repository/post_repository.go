@@ -20,7 +20,7 @@ func (r *PostRepository) Save(post *entity.Post) error {
 }
 func (r *PostRepository) FindById(id int64) (*entity.Post, error) {
 	post := new(entity.Post)
-	err := r.db.Where("id = ?", id).Preload("Likes").First(post).Error
+	err := r.db.Where("id = ?", id).Preload("Likes").Preload("Comments").First(post).Error
 	if err != nil {
 		return nil, err
 	}

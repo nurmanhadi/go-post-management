@@ -9,4 +9,5 @@ type Post struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	Likes       []Like
+	Comments    []Comment
 }

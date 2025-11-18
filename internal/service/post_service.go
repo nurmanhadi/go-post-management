@@ -2,6 +2,7 @@ package service
 
 import (
 	"net/http"
+	"post-management/internal/cache"
 	"post-management/internal/entity"
 	"post-management/internal/repository"
 	"post-management/pkg/api"
@@ -9,6 +10,7 @@ import (
 	"post-management/pkg/response"
 	"strconv"
 
+	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
@@ -20,15 +22,17 @@ type PostService struct {
 	postRepository    *repository.PostRepository
 	likeRepository    *repository.LikeRepository
 	commentRepository *repository.CommentRepository
+	postCache         *cache.PostCache
 }
 
-func NewPostService(logger zerolog.Logger, validator *validator.Validate, postRepository *repository.PostRepository, likeRepository *repository.LikeRepository, commentRepository *repository.CommentRepository) *PostService {
+func NewPostService(logger zerolog.Logger, validator *validator.Validate, postRepository *repository.PostRepository, likeRepository *repository.LikeRepository, commentRepository *repository.CommentRepository, postCache *cache.PostCache) *PostService {
 	return &PostService{
 		logger:            logger,
 		validator:         validator,
 		postRepository:    postRepository,
 		likeRepository:    likeRepository,
 		commentRepository: commentRepository,
+		postCache:         postCache,
 	}
 }
 
@@ -77,6 +81,9 @@ func (s *PostService) PostUpdate(id string, request *dto.PostUpdateRequest) erro
 		s.logger.Error().Err(err).Msg("failed find by id to database")
 		return err
 	}
+	if err := s.postCache.DeleteById(newId); err != nil {
+		s.logger.Error().Err(err).Msg("failed delete by id to cache")
+	}
 	if err := s.postRepository.Save(post); err != nil {
 		s.logger.Error().Err(err).Msg("failed save to database")
 		return err
@@ -90,36 +97,90 @@ func (s *PostService) PostGetById(id string) (*dto.PostResponse, error) {
 		s.logger.Error().Err(err).Msg("failed parse string to int64")
 		return nil, err
 	}
-	post, err := s.postRepository.FindById(newId)
+	resp, err := s.postCache.GetById(newId)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			s.logger.Warn().Err(err).Msg("post not found")
-			return nil, response.Except(http.StatusNotFound, "post not found")
+		if err == memcache.ErrCacheMiss {
+			post, err := s.postRepository.FindById(newId)
+			if err != nil {
+				if err == gorm.ErrRecordNotFound {
+					s.logger.Warn().Err(err).Msg("post not found")
+					return nil, response.Except(http.StatusNotFound, "post not found")
+				}
+				s.logger.Error().Err(err).Msg("failed find by id to database")
+				return nil, err
+			}
+			user, err := api.UserGetById(post.UserId)
+			if err != nil {
+				s.logger.Error().Err(err).Msg("failed get by id to user service")
+				return nil, err
+			}
+			userIds := make([]int64, 0, len(post.Comments))
+			if len(post.Comments) != 0 {
+				for _, x := range post.Comments {
+					userIds = append(userIds, x.UserId)
+				}
+			}
+			body := &dto.ApiUserGetBySliceIdBody{
+				Ids: userIds,
+			}
+			users, err := api.UserGetBySliceId(body)
+			if err != nil {
+				s.logger.Error().Err(err).Msg("failed get by slice id to user service")
+				return nil, err
+			}
+			comments := make([]dto.CommentResponse, 0, len(post.Comments))
+			if len(post.Comments) != 0 {
+				for _, x := range post.Comments {
+					for _, y := range users {
+						if x.UserId == y.Id {
+							comments = append(comments, dto.CommentResponse{
+								Id:          x.Id,
+								Description: x.Description,
+								User: dto.UserResponse{
+									Id:       y.Id,
+									Username: y.Username,
+									Name: dto.UserNameInfo{
+										FirstName: y.Name.FirstName,
+										Lastname:  y.Name.Lastname,
+									},
+									AvatarUrl: y.AvatarUrl,
+								},
+								CreatedAt: x.CreatedAt,
+								UpdatedAt: x.UpdatedAt,
+							})
+						}
+					}
+				}
+			}
+			resp := &dto.PostResponse{
+				Id:           post.Id,
+				Description:  post.Description,
+				TotalLike:    len(post.Likes),
+				TotalComment: len(post.Comments),
+				User: dto.UserResponse{
+					Id:       user.Id,
+					Username: user.Username,
+					Name: dto.UserNameInfo{
+						FirstName: user.Name.FirstName,
+						Lastname:  user.Name.Lastname,
+					},
+					AvatarUrl: user.AvatarUrl,
+				},
+				Comments:  comments,
+				CreatedAt: post.CreatedAt,
+				UpdatedAt: post.UpdatedAt,
+			}
+			if err := s.postCache.SetById(post.Id, resp); err != nil {
+				s.logger.Error().Err(err).Msg("failed set by id to cache")
+				return nil, err
+			}
+			s.logger.Info().Str("post_id", id).Msg("post get by id success")
+			return resp, nil
 		}
-		s.logger.Error().Err(err).Msg("failed find by id to database")
+		s.logger.Error().Err(err).Msg("failed get by id to cache")
 		return nil, err
 	}
-	user, err := api.UserGetById(post.UserId)
-	if err != nil {
-		s.logger.Error().Err(err).Msg("failed get by id to user service")
-		return nil, err
-	}
-	resp := &dto.PostResponse{
-		Id:          post.Id,
-		Description: post.Description,
-		TotalLike:   len(post.Likes),
-		User: dto.UserResponse{
-			Id:       user.Id,
-			Username: user.Username,
-			Name: dto.UserNameInfo{
-				FirstName: user.Name.FirstName,
-				Lastname:  user.Name.Lastname,
-			},
-			AvatarUrl: user.AvatarUrl,
-		},
-		CreatedAt: post.CreatedAt,
-		UpdatedAt: post.UpdatedAt,
-	}
+
 	s.logger.Info().Str("post_id", id).Msg("post get by id success")
 	return resp, nil
 }
@@ -137,6 +198,9 @@ func (s *PostService) PostDelete(id string) error {
 		}
 		s.logger.Error().Err(err).Msg("failed find by id to database")
 		return err
+	}
+	if err := s.postCache.DeleteById(newId); err != nil {
+		s.logger.Error().Err(err).Msg("failed delete by id to cache")
 	}
 	if err := s.postRepository.Delete(post.Id); err != nil {
 		s.logger.Error().Err(err).Msg("failed delete post to database")
@@ -183,6 +247,9 @@ func (s *PostService) PostLike(request *dto.LikeAddRequest) error {
 		PostId: request.PostId,
 		UserId: request.UserId,
 	}
+	if err := s.postCache.DeleteById(request.PostId); err != nil {
+		s.logger.Error().Err(err).Msg("failed delete by id to cache")
+	}
 	if err := s.likeRepository.Save(like); err != nil {
 		s.logger.Error().Err(err).Msg("failed save to database")
 		return err
@@ -222,6 +289,9 @@ func (s *PostService) PostUnlike(request *dto.LikeDeleteRequest) error {
 		s.logger.Error().Err(err).Msg("failed find by post_id and user_id to database")
 		return err
 	}
+	if err := s.postCache.DeleteById(request.PostId); err != nil {
+		s.logger.Error().Err(err).Msg("failed delete by id to cache")
+	}
 	if err := s.likeRepository.Delete(like.Id); err != nil {
 		s.logger.Error().Err(err).Msg("failed delete to database")
 		return err
@@ -258,6 +328,9 @@ func (s *PostService) PostComment(request *dto.CommentAddRequest) error {
 		PostId:      request.PostId,
 		UserId:      request.UserId,
 		Description: request.Description,
+	}
+	if err := s.postCache.DeleteById(request.PostId); err != nil {
+		s.logger.Error().Err(err).Msg("failed delete by id to cache")
 	}
 	if err := s.commentRepository.Save(comment); err != nil {
 		s.logger.Error().Err(err).Msg("failed save to database")
@@ -297,6 +370,9 @@ func (s *PostService) PostDeleteComment(request *dto.CommentDeleteRequest) error
 		}
 		s.logger.Error().Err(err).Msg("failed find by post_id and user_id to database")
 		return err
+	}
+	if err := s.postCache.DeleteById(request.PostId); err != nil {
+		s.logger.Error().Err(err).Msg("failed delete by id to cache")
 	}
 	if err := s.commentRepository.Delete(comment.Id); err != nil {
 		s.logger.Error().Err(err).Msg("failed delete to database")
