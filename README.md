@@ -1,6 +1,6 @@
 # Post Management
 
-microservice built with Go for handling post, like, comment in a microservices architecture.
+A Go-based microservice responsible for managing posts, likes, and comments within a distributed microservices architecture.
 
 ## Tech Stack
 
