@@ -32,9 +32,10 @@ func Initialize(deps *Bootstrap) {
 	// repository
 	postRepo := repository.NewPostRepository(deps.DB)
 	likeRepo := repository.NewLikeRepository(deps.DB)
+	commentRepo := repository.NewCommentRepository(deps.DB)
 
 	// service
-	postServ := service.NewPostService(deps.Logger, deps.Validator, postRepo, likeRepo)
+	postServ := service.NewPostService(deps.Logger, deps.Validator, postRepo, likeRepo, commentRepo)
 
 	// handler
 	postHand := handler.NewPostHandler(postServ)

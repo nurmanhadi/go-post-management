@@ -15,20 +15,24 @@ import (
 )
 
 type PostService struct {
-	logger         zerolog.Logger
-	validator      *validator.Validate
-	postRepository *repository.PostRepository
-	likeRepository *repository.LikeRepository
+	logger            zerolog.Logger
+	validator         *validator.Validate
+	postRepository    *repository.PostRepository
+	likeRepository    *repository.LikeRepository
+	commentRepository *repository.CommentRepository
 }
 
-func NewPostService(logger zerolog.Logger, validator *validator.Validate, postRepository *repository.PostRepository, likeRepository *repository.LikeRepository) *PostService {
+func NewPostService(logger zerolog.Logger, validator *validator.Validate, postRepository *repository.PostRepository, likeRepository *repository.LikeRepository, commentRepository *repository.CommentRepository) *PostService {
 	return &PostService{
-		logger:         logger,
-		validator:      validator,
-		postRepository: postRepository,
-		likeRepository: likeRepository,
+		logger:            logger,
+		validator:         validator,
+		postRepository:    postRepository,
+		likeRepository:    likeRepository,
+		commentRepository: commentRepository,
 	}
 }
+
+// post
 func (s *PostService) PostCreate(request *dto.PostAddRequest) error {
 	if err := s.validator.Struct(request); err != nil {
 		s.logger.Warn().Err(err).Msg("failed to validate request")
@@ -103,6 +107,7 @@ func (s *PostService) PostGetById(id string) (*dto.PostResponse, error) {
 	resp := &dto.PostResponse{
 		Id:          post.Id,
 		Description: post.Description,
+		TotalLike:   len(post.Likes),
 		User: dto.UserResponse{
 			Id:       user.Id,
 			Username: user.Username,
@@ -140,6 +145,8 @@ func (s *PostService) PostDelete(id string) error {
 	s.logger.Info().Str("post_id", id).Msg("post delete success")
 	return nil
 }
+
+// like
 func (s *PostService) PostLike(request *dto.LikeAddRequest) error {
 	if err := s.validator.Struct(request); err != nil {
 		s.logger.Warn().Err(err).Msg("failed to validate request")
@@ -220,5 +227,81 @@ func (s *PostService) PostUnlike(request *dto.LikeDeleteRequest) error {
 		return err
 	}
 	s.logger.Info().Str("like_id", strconv.Itoa(int(like.Id))).Msg("post unlike success")
+	return nil
+}
+
+// comment
+func (s *PostService) PostComment(request *dto.CommentAddRequest) error {
+	if err := s.validator.Struct(request); err != nil {
+		s.logger.Warn().Err(err).Msg("failed to validate request")
+		return err
+	}
+	totalPost, err := s.postRepository.CountById(request.PostId)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("failed count by id to database")
+		return err
+	}
+	if totalPost < 1 {
+		s.logger.Warn().Msg("post not found")
+		return response.Except(404, "post not found")
+	}
+	totalUser, err := api.UserCountById(request.UserId)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("failed count by id to user service")
+		return err
+	}
+	if totalUser < 1 {
+		s.logger.Warn().Msg("user not found")
+		return response.Except(404, "user not found")
+	}
+	comment := &entity.Comment{
+		PostId:      request.PostId,
+		UserId:      request.UserId,
+		Description: request.Description,
+	}
+	if err := s.commentRepository.Save(comment); err != nil {
+		s.logger.Error().Err(err).Msg("failed save to database")
+		return err
+	}
+	s.logger.Info().Str("post_id", strconv.Itoa(int(request.PostId))).Msg("post comment success")
+	return nil
+}
+func (s *PostService) PostDeleteComment(request *dto.CommentDeleteRequest) error {
+	if err := s.validator.Struct(request); err != nil {
+		s.logger.Warn().Err(err).Msg("failed to validate request")
+		return err
+	}
+	totalPost, err := s.postRepository.CountById(request.PostId)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("failed count by id to database")
+		return err
+	}
+	if totalPost < 1 {
+		s.logger.Warn().Msg("post not found")
+		return response.Except(404, "post not found")
+	}
+	totalUser, err := api.UserCountById(request.UserId)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("failed count by id to user service")
+		return err
+	}
+	if totalUser < 1 {
+		s.logger.Warn().Msg("user not found")
+		return response.Except(404, "user not found")
+	}
+	comment, err := s.commentRepository.FindByPostIdAndUserId(request.PostId, request.UserId)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			s.logger.Warn().Err(err).Msg("comment not found")
+			return response.Except(http.StatusNotFound, "comment not found")
+		}
+		s.logger.Error().Err(err).Msg("failed find by post_id and user_id to database")
+		return err
+	}
+	if err := s.commentRepository.Delete(comment.Id); err != nil {
+		s.logger.Error().Err(err).Msg("failed delete to database")
+		return err
+	}
+	s.logger.Info().Str("comment_id", strconv.Itoa(int(comment.Id))).Msg("post delete comment success")
 	return nil
 }

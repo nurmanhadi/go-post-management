@@ -23,6 +23,10 @@ func (r *Router) New() {
 				likes.Post("/", r.PostHandler.PostLike)
 				likes.Delete("/", r.PostHandler.PostUnlike)
 			})
+			posts.Route("/comments", func(comments chi.Router) {
+				comments.Post("/", r.PostHandler.PostComment)
+				comments.Delete("/", r.PostHandler.PostDeleteComment)
+			})
 		})
 	})
 }

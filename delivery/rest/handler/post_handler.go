@@ -18,6 +18,8 @@ func NewPostHandler(postService *service.PostService) *PostHandler {
 		postService: postService,
 	}
 }
+
+// post
 func (h *PostHandler) PostCreate(w http.ResponseWriter, r *http.Request) {
 	request := new(dto.PostAddRequest)
 	if err := json.NewDecoder(r.Body).Decode(request); err != nil {
@@ -57,6 +59,8 @@ func (h *PostHandler) PostDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	response.Success(w, 200, "OK", r.URL.Path)
 }
+
+// like
 func (h *PostHandler) PostLike(w http.ResponseWriter, r *http.Request) {
 	request := new(dto.LikeAddRequest)
 	if err := json.NewDecoder(r.Body).Decode(request); err != nil {
@@ -74,6 +78,30 @@ func (h *PostHandler) PostUnlike(w http.ResponseWriter, r *http.Request) {
 		panic(response.Except(400, "failed to parse json"))
 	}
 	err := h.postService.PostUnlike(request)
+	if err != nil {
+		panic(err)
+	}
+	response.Success(w, 200, "OK", r.URL.Path)
+}
+
+// comment
+func (h *PostHandler) PostComment(w http.ResponseWriter, r *http.Request) {
+	request := new(dto.CommentAddRequest)
+	if err := json.NewDecoder(r.Body).Decode(request); err != nil {
+		panic(response.Except(400, "failed to parse json"))
+	}
+	err := h.postService.PostComment(request)
+	if err != nil {
+		panic(err)
+	}
+	response.Success(w, 201, "OK", r.URL.Path)
+}
+func (h *PostHandler) PostDeleteComment(w http.ResponseWriter, r *http.Request) {
+	request := new(dto.CommentDeleteRequest)
+	if err := json.NewDecoder(r.Body).Decode(request); err != nil {
+		panic(response.Except(400, "failed to parse json"))
+	}
+	err := h.postService.PostDeleteComment(request)
 	if err != nil {
 		panic(err)
 	}
