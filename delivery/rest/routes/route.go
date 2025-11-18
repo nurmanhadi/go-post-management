@@ -21,7 +21,7 @@ func (r *Router) New() {
 
 			posts.Route("/likes", func(likes chi.Router) {
 				likes.Post("/", r.PostHandler.PostLike)
-				likes.Delete("/{id}", r.PostHandler.PostUnlike)
+				likes.Delete("/", r.PostHandler.PostUnlike)
 			})
 		})
 	})

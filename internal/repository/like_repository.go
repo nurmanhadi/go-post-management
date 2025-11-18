@@ -37,3 +37,11 @@ func (r *LikeRepository) CountByPostIdAndUserId(postId, userId int64) (int64, er
 	}
 	return count, nil
 }
+func (r *LikeRepository) FindByPostIdAndUserId(postId, userId int64) (*entity.Like, error) {
+	like := new(entity.Like)
+	err := r.db.Where("post_id = ? AND user_id = ?", postId, userId).First(like).Error
+	if err != nil {
+		return nil, err
+	}
+	return like, nil
+}

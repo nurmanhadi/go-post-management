@@ -69,8 +69,11 @@ func (h *PostHandler) PostLike(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, 201, "OK", r.URL.Path)
 }
 func (h *PostHandler) PostUnlike(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	err := h.postService.PostUnlike(id)
+	request := new(dto.LikeDeleteRequest)
+	if err := json.NewDecoder(r.Body).Decode(request); err != nil {
+		panic(response.Except(400, "failed to parse json"))
+	}
+	err := h.postService.PostUnlike(request)
 	if err != nil {
 		panic(err)
 	}

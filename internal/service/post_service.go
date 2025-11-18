@@ -183,25 +183,42 @@ func (s *PostService) PostLike(request *dto.LikeAddRequest) error {
 	s.logger.Info().Str("post_id", strconv.Itoa(int(request.PostId))).Msg("post like success")
 	return nil
 }
-func (s *PostService) PostUnlike(id string) error {
-	newId, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		s.logger.Error().Err(err).Msg("failed parse string to int64")
+func (s *PostService) PostUnlike(request *dto.LikeDeleteRequest) error {
+	if err := s.validator.Struct(request); err != nil {
+		s.logger.Warn().Err(err).Msg("failed to validate request")
 		return err
 	}
-	totalLike, err := s.likeRepository.CountById(newId)
+	totalPost, err := s.postRepository.CountById(request.PostId)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("failed count by id to database")
 		return err
 	}
-	if totalLike < 1 {
-		s.logger.Warn().Msg("like not found")
-		return response.Except(404, "like not found")
+	if totalPost < 1 {
+		s.logger.Warn().Msg("post not found")
+		return response.Except(404, "post not found")
 	}
-	if err := s.likeRepository.Delete(newId); err != nil {
+	totalUser, err := api.UserCountById(request.UserId)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("failed count by id to user service")
+		return err
+	}
+	if totalUser < 1 {
+		s.logger.Warn().Msg("user not found")
+		return response.Except(404, "user not found")
+	}
+	like, err := s.likeRepository.FindByPostIdAndUserId(request.PostId, request.UserId)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			s.logger.Warn().Err(err).Msg("like not found")
+			return response.Except(http.StatusNotFound, "like not found")
+		}
+		s.logger.Error().Err(err).Msg("failed find by post_id and user_id to database")
+		return err
+	}
+	if err := s.likeRepository.Delete(like.Id); err != nil {
 		s.logger.Error().Err(err).Msg("failed delete to database")
 		return err
 	}
-	s.logger.Info().Str("like_id", strconv.Itoa(int(newId))).Msg("post unlike success")
+	s.logger.Info().Str("like_id", strconv.Itoa(int(like.Id))).Msg("post unlike success")
 	return nil
 }
