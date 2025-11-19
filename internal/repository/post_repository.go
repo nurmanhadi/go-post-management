@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"post-management/internal/entity"
 
 	"gorm.io/gorm"
@@ -14,6 +15,14 @@ func NewPostRepository(db *gorm.DB) *PostRepository {
 	return &PostRepository{
 		db: db,
 	}
+}
+func (r *PostRepository) Create(post *entity.Post) (int64, error) {
+	ctx := context.Background()
+	err := gorm.G[entity.Post](r.db).Create(ctx, post)
+	if err != nil {
+		return 0, err
+	}
+	return post.Id, nil
 }
 func (r *PostRepository) Save(post *entity.Post) error {
 	return r.db.Save(post).Error

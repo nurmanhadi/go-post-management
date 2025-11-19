@@ -5,6 +5,7 @@ import (
 	"post-management/delivery/rest/middleware"
 	"post-management/delivery/rest/routes"
 	"post-management/internal/cache"
+	"post-management/internal/event/producer"
 	"post-management/internal/repository"
 	"post-management/internal/service"
 
@@ -27,6 +28,7 @@ type Bootstrap struct {
 
 func Initialize(deps *Bootstrap) {
 	// publisher
+	postProd := producer.NewPostProducer(deps.Ch)
 
 	// cache
 	postCache := cache.NewPostCache(deps.Cache)
@@ -37,7 +39,7 @@ func Initialize(deps *Bootstrap) {
 	commentRepo := repository.NewCommentRepository(deps.DB)
 
 	// service
-	postServ := service.NewPostService(deps.Logger, deps.Validator, postRepo, likeRepo, commentRepo, postCache)
+	postServ := service.NewPostService(deps.Logger, deps.Validator, postRepo, likeRepo, commentRepo, postCache, postProd)
 
 	// handler
 	postHand := handler.NewPostHandler(postServ)

@@ -4,11 +4,14 @@ import (
 	"net/http"
 	"post-management/internal/cache"
 	"post-management/internal/entity"
+	"post-management/internal/event/producer"
 	"post-management/internal/repository"
+	"post-management/pkg"
 	"post-management/pkg/api"
 	"post-management/pkg/dto"
 	"post-management/pkg/response"
 	"strconv"
+	"time"
 
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/go-playground/validator/v10"
@@ -23,9 +26,10 @@ type PostService struct {
 	likeRepository    *repository.LikeRepository
 	commentRepository *repository.CommentRepository
 	postCache         *cache.PostCache
+	postProducer      *producer.PostProducer
 }
 
-func NewPostService(logger zerolog.Logger, validator *validator.Validate, postRepository *repository.PostRepository, likeRepository *repository.LikeRepository, commentRepository *repository.CommentRepository, postCache *cache.PostCache) *PostService {
+func NewPostService(logger zerolog.Logger, validator *validator.Validate, postRepository *repository.PostRepository, likeRepository *repository.LikeRepository, commentRepository *repository.CommentRepository, postCache *cache.PostCache, postProducer *producer.PostProducer) *PostService {
 	return &PostService{
 		logger:            logger,
 		validator:         validator,
@@ -33,6 +37,7 @@ func NewPostService(logger zerolog.Logger, validator *validator.Validate, postRe
 		likeRepository:    likeRepository,
 		commentRepository: commentRepository,
 		postCache:         postCache,
+		postProducer:      postProducer,
 	}
 }
 
@@ -51,14 +56,38 @@ func (s *PostService) PostCreate(request *dto.PostAddRequest) error {
 		s.logger.Warn().Msg("user not found")
 		return response.Except(404, "user not found")
 	}
+	timestamp := time.Now()
 	post := &entity.Post{
 		UserId:      request.UserId,
 		Description: request.Description,
+		CreatedAt:   timestamp,
+		UpdatedAt:   timestamp,
 	}
-	if err := s.postRepository.Save(post); err != nil {
+	id, err := s.postRepository.Create(post)
+	if err != nil {
 		s.logger.Error().Err(err).Msg("failed save to database")
 		return err
 	}
+	go func() {
+		data := &dto.EventProducer[dto.EventPostCreatedProducer]{
+			Event:     pkg.BROKER_ROUTE_POST_CREATED,
+			Timestamp: timestamp,
+			Data: dto.EventPostCreatedProducer{
+				PostId:       id,
+				UserId:       post.UserId,
+				Description:  post.Description,
+				TotalLike:    0,
+				TotalComment: 0,
+				CreatedAt:    timestamp,
+				UpdatedAt:    timestamp,
+			},
+		}
+		err := s.postProducer.PostCreated(data)
+		if err != nil {
+			s.logger.Error().Err(err).Msg("failed post created to producer")
+			return
+		}
+	}()
 	s.logger.Info().Str("user_id", strconv.Itoa(int(request.UserId))).Msg("post create success")
 	return nil
 }
