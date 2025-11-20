@@ -29,9 +29,9 @@ func (r *CommentRepository) CountById(id int64) (int64, error) {
 	}
 	return count, nil
 }
-func (r *CommentRepository) FindByPostIdAndUserId(postId, userId int64) (*entity.Comment, error) {
+func (r *CommentRepository) FindById(id int64) (*entity.Comment, error) {
 	comment := new(entity.Comment)
-	err := r.db.Where("post_id = ? AND user_id = ?", postId, userId).First(comment).Error
+	err := r.db.Where("id = ?", id).First(comment).Error
 	if err != nil {
 		return nil, err
 	}

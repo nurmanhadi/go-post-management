@@ -213,23 +213,14 @@
 
 ### Delete Post
 
-**Endpoint:** `DELETE /api/posts/comments`
-
-**Request Body:**
-
-```json
-{
-  "post_id": 1,
-  "user_id": 1
-}
-```
+**Endpoint:** `DELETE /api/posts/comments/{id}`
 
 **Response Body:**
 
 ```json
 {
   "data": "OK",
-  "path": "/api/posts/comments"
+  "path": "/api/posts/comments/{id}"
 }
 ```
 

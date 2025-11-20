@@ -97,11 +97,8 @@ func (h *PostHandler) PostComment(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, 201, "OK", r.URL.Path)
 }
 func (h *PostHandler) PostDeleteComment(w http.ResponseWriter, r *http.Request) {
-	request := new(dto.CommentDeleteRequest)
-	if err := json.NewDecoder(r.Body).Decode(request); err != nil {
-		panic(response.Except(400, "failed to parse json"))
-	}
-	err := h.postService.PostDeleteComment(request)
+	id := r.PathValue("id")
+	err := h.postService.PostDeleteComment(id)
 	if err != nil {
 		panic(err)
 	}

@@ -25,7 +25,7 @@ func (r *Router) New() {
 			})
 			posts.Route("/comments", func(comments chi.Router) {
 				comments.Post("/", r.PostHandler.PostComment)
-				comments.Delete("/", r.PostHandler.PostDeleteComment)
+				comments.Delete("/{id}", r.PostHandler.PostDeleteComment)
 			})
 		})
 	})

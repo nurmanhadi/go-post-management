@@ -438,30 +438,13 @@ func (s *PostService) PostComment(request *dto.CommentAddRequest) error {
 	s.logger.Info().Str("post_id", strconv.Itoa(int(request.PostId))).Msg("post comment success")
 	return nil
 }
-func (s *PostService) PostDeleteComment(request *dto.CommentDeleteRequest) error {
-	if err := s.validator.Struct(request); err != nil {
-		s.logger.Warn().Err(err).Msg("failed to validate request")
-		return err
-	}
-	totalPost, err := s.postRepository.CountById(request.PostId)
+func (s *PostService) PostDeleteComment(id string) error {
+	newId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("failed count by id to database")
+		s.logger.Error().Err(err).Msg("failed parse string to int64")
 		return err
 	}
-	if totalPost < 1 {
-		s.logger.Warn().Msg("post not found")
-		return response.Except(404, "post not found")
-	}
-	totalUser, err := api.UserCountById(request.UserId)
-	if err != nil {
-		s.logger.Error().Err(err).Msg("failed count by id to user service")
-		return err
-	}
-	if totalUser < 1 {
-		s.logger.Warn().Msg("user not found")
-		return response.Except(404, "user not found")
-	}
-	comment, err := s.commentRepository.FindByPostIdAndUserId(request.PostId, request.UserId)
+	comment, err := s.commentRepository.FindById(newId)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			s.logger.Warn().Err(err).Msg("comment not found")
@@ -476,15 +459,15 @@ func (s *PostService) PostDeleteComment(request *dto.CommentDeleteRequest) error
 	}
 	go func() {
 		timestamp := time.Now()
-		if err := s.postCache.DeleteById(request.PostId); err != nil {
+		if err := s.postCache.DeleteById(comment.PostId); err != nil {
 			s.logger.Error().Err(err).Msg("failed delete by id to cache")
 		}
 		data := &dto.EventProducer[dto.EventCommentTotalProducer]{
 			Event:     pkg.BROKER_ROUTE_COMMENT_TOTAL,
 			Timestamp: timestamp,
 			Data: dto.EventCommentTotalProducer{
-				PostId: request.PostId,
-				Total:  true,
+				PostId: comment.PostId,
+				Total:  false,
 			},
 		}
 		err := s.postProducer.CommentTotal(data)
