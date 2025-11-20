@@ -35,6 +35,14 @@ func (r *PostRepository) FindById(id int64) (*entity.Post, error) {
 	}
 	return post, nil
 }
+func (r *PostRepository) FindByIdJoinLikeAndComment(id int64) (*entity.Post, error) {
+	post := new(entity.Post)
+	err := r.db.Where("id = ?", id).Preload("Likes").Preload("Comments").First(post).Error
+	if err != nil {
+		return nil, err
+	}
+	return post, nil
+}
 func (r *PostRepository) Delete(id int64) error {
 	return r.db.Where("id = ?", id).Delete(&entity.Post{}).Error
 }

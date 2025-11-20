@@ -42,3 +42,118 @@ func (p *PostProducer) PostCreated(data *dto.EventProducer[dto.EventPostCreatedP
 	}
 	return nil
 }
+func (p *PostProducer) PostUpdated(data *dto.EventProducer[dto.EventPostUpdatedProducer]) error {
+	body, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = p.ch.PublishWithContext(
+		ctx,
+		pkg.BROKER_EXCHANGE_POST_MANAGEMENT,
+		pkg.BROKER_ROUTE_POST_UPDATED,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func (p *PostProducer) PostLike(data *dto.EventProducer[dto.EventPostLikeProducer]) error {
+	body, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = p.ch.PublishWithContext(
+		ctx,
+		pkg.BROKER_EXCHANGE_POST_MANAGEMENT,
+		pkg.BROKER_ROUTE_POST_LIKE,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func (p *PostProducer) PostUnlike(data *dto.EventProducer[dto.EventPostUnlikeProducer]) error {
+	body, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = p.ch.PublishWithContext(
+		ctx,
+		pkg.BROKER_EXCHANGE_POST_MANAGEMENT,
+		pkg.BROKER_ROUTE_POST_UNLIKE,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func (p *PostProducer) CommentIncrement(data *dto.EventProducer[dto.EventCommentIncrementProducer]) error {
+	body, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = p.ch.PublishWithContext(
+		ctx,
+		pkg.BROKER_EXCHANGE_POST_MANAGEMENT,
+		pkg.BROKER_ROUTE_COMMENT_INCREMENT,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func (p *PostProducer) CommentDecrement(data *dto.EventProducer[dto.EventCommentDecrementProducer]) error {
+	body, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = p.ch.PublishWithContext(
+		ctx,
+		pkg.BROKER_EXCHANGE_POST_MANAGEMENT,
+		pkg.BROKER_ROUTE_COMMENT_DECREMENT,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}

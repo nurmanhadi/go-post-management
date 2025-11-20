@@ -101,6 +101,7 @@ func (s *PostService) PostUpdate(id string, request *dto.PostUpdateRequest) erro
 		s.logger.Error().Err(err).Msg("failed parse string to int64")
 		return err
 	}
+	timestamp := time.Now()
 	post, err := s.postRepository.FindById(newId)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -110,14 +111,36 @@ func (s *PostService) PostUpdate(id string, request *dto.PostUpdateRequest) erro
 		s.logger.Error().Err(err).Msg("failed find by id to database")
 		return err
 	}
-	if err := s.postCache.DeleteById(newId); err != nil {
-		s.logger.Error().Err(err).Msg("failed delete by id to cache")
-	}
+	post.Description = request.Description
+	post.UpdatedAt = timestamp
 	if err := s.postRepository.Save(post); err != nil {
 		s.logger.Error().Err(err).Msg("failed save to database")
 		return err
 	}
-	s.logger.Info().Str("post_id", id).Msg("post create success")
+	go func() {
+		if err := s.postCache.DeleteById(newId); err != nil {
+			s.logger.Error().Err(err).Msg("failed delete by id to cache")
+		}
+		data := &dto.EventProducer[dto.EventPostUpdatedProducer]{
+			Event:     pkg.BROKER_ROUTE_POST_UPDATED,
+			Timestamp: timestamp,
+			Data: dto.EventPostUpdatedProducer{
+				PostId:       newId,
+				UserId:       post.UserId,
+				Description:  post.Description,
+				TotalLike:    0,
+				TotalComment: 0,
+				CreatedAt:    post.CreatedAt,
+				UpdatedAt:    timestamp,
+			},
+		}
+		err := s.postProducer.PostUpdated(data)
+		if err != nil {
+			s.logger.Error().Err(err).Msg("failed post update to producer")
+			return
+		}
+	}()
+	s.logger.Info().Str("post_id", id).Msg("post update success")
 	return nil
 }
 func (s *PostService) PostGetById(id string) (*dto.PostResponse, error) {
@@ -129,7 +152,7 @@ func (s *PostService) PostGetById(id string) (*dto.PostResponse, error) {
 	resp, err := s.postCache.GetById(newId)
 	if err != nil {
 		if err == memcache.ErrCacheMiss {
-			post, err := s.postRepository.FindById(newId)
+			post, err := s.postRepository.FindByIdJoinLikeAndComment(newId)
 			if err != nil {
 				if err == gorm.ErrRecordNotFound {
 					s.logger.Warn().Err(err).Msg("post not found")
@@ -199,10 +222,11 @@ func (s *PostService) PostGetById(id string) (*dto.PostResponse, error) {
 				CreatedAt: post.CreatedAt,
 				UpdatedAt: post.UpdatedAt,
 			}
-			if err := s.postCache.SetById(post.Id, resp); err != nil {
-				s.logger.Error().Err(err).Msg("failed set by id to cache")
-				return nil, err
-			}
+			go func() {
+				if err := s.postCache.SetById(post.Id, resp); err != nil {
+					s.logger.Error().Err(err).Msg("failed set by id to cache")
+				}
+			}()
 			s.logger.Info().Str("post_id", id).Msg("post get by id success")
 			return resp, nil
 		}
@@ -228,13 +252,15 @@ func (s *PostService) PostDelete(id string) error {
 		s.logger.Error().Err(err).Msg("failed find by id to database")
 		return err
 	}
-	if err := s.postCache.DeleteById(newId); err != nil {
-		s.logger.Error().Err(err).Msg("failed delete by id to cache")
-	}
 	if err := s.postRepository.Delete(post.Id); err != nil {
 		s.logger.Error().Err(err).Msg("failed delete post to database")
 		return err
 	}
+	go func() {
+		if err := s.postCache.DeleteById(newId); err != nil {
+			s.logger.Error().Err(err).Msg("failed delete by id to cache")
+		}
+	}()
 	s.logger.Info().Str("post_id", id).Msg("post delete success")
 	return nil
 }
@@ -276,13 +302,29 @@ func (s *PostService) PostLike(request *dto.LikeAddRequest) error {
 		PostId: request.PostId,
 		UserId: request.UserId,
 	}
-	if err := s.postCache.DeleteById(request.PostId); err != nil {
-		s.logger.Error().Err(err).Msg("failed delete by id to cache")
-	}
 	if err := s.likeRepository.Save(like); err != nil {
 		s.logger.Error().Err(err).Msg("failed save to database")
 		return err
 	}
+	go func() {
+		timestamp := time.Now()
+		if err := s.postCache.DeleteById(request.PostId); err != nil {
+			s.logger.Error().Err(err).Msg("failed delete by id to cache")
+		}
+		data := &dto.EventProducer[dto.EventPostLikeProducer]{
+			Event:     pkg.BROKER_ROUTE_POST_LIKE,
+			Timestamp: timestamp,
+			Data: dto.EventPostLikeProducer{
+				PostId: request.PostId,
+				Total:  1,
+			},
+		}
+		err := s.postProducer.PostLike(data)
+		if err != nil {
+			s.logger.Error().Err(err).Msg("failed post Like to producer")
+			return
+		}
+	}()
 	s.logger.Info().Str("post_id", strconv.Itoa(int(request.PostId))).Msg("post like success")
 	return nil
 }
@@ -318,13 +360,29 @@ func (s *PostService) PostUnlike(request *dto.LikeDeleteRequest) error {
 		s.logger.Error().Err(err).Msg("failed find by post_id and user_id to database")
 		return err
 	}
-	if err := s.postCache.DeleteById(request.PostId); err != nil {
-		s.logger.Error().Err(err).Msg("failed delete by id to cache")
-	}
 	if err := s.likeRepository.Delete(like.Id); err != nil {
 		s.logger.Error().Err(err).Msg("failed delete to database")
 		return err
 	}
+	go func() {
+		timestamp := time.Now()
+		if err := s.postCache.DeleteById(request.PostId); err != nil {
+			s.logger.Error().Err(err).Msg("failed delete by id to cache")
+		}
+		data := &dto.EventProducer[dto.EventPostUnlikeProducer]{
+			Event:     pkg.BROKER_ROUTE_POST_UNLIKE,
+			Timestamp: timestamp,
+			Data: dto.EventPostUnlikeProducer{
+				PostId: request.PostId,
+				Total:  1,
+			},
+		}
+		err := s.postProducer.PostUnlike(data)
+		if err != nil {
+			s.logger.Error().Err(err).Msg("failed post unlike to producer")
+			return
+		}
+	}()
 	s.logger.Info().Str("like_id", strconv.Itoa(int(like.Id))).Msg("post unlike success")
 	return nil
 }
@@ -358,13 +416,29 @@ func (s *PostService) PostComment(request *dto.CommentAddRequest) error {
 		UserId:      request.UserId,
 		Description: request.Description,
 	}
-	if err := s.postCache.DeleteById(request.PostId); err != nil {
-		s.logger.Error().Err(err).Msg("failed delete by id to cache")
-	}
 	if err := s.commentRepository.Save(comment); err != nil {
 		s.logger.Error().Err(err).Msg("failed save to database")
 		return err
 	}
+	go func() {
+		timestamp := time.Now()
+		if err := s.postCache.DeleteById(request.PostId); err != nil {
+			s.logger.Error().Err(err).Msg("failed delete by id to cache")
+		}
+		data := &dto.EventProducer[dto.EventCommentIncrementProducer]{
+			Event:     pkg.BROKER_ROUTE_COMMENT_INCREMENT,
+			Timestamp: timestamp,
+			Data: dto.EventCommentIncrementProducer{
+				PostId: request.PostId,
+				Total:  1,
+			},
+		}
+		err := s.postProducer.CommentIncrement(data)
+		if err != nil {
+			s.logger.Error().Err(err).Msg("failed comment increment to producer")
+			return
+		}
+	}()
 	s.logger.Info().Str("post_id", strconv.Itoa(int(request.PostId))).Msg("post comment success")
 	return nil
 }
@@ -400,13 +474,29 @@ func (s *PostService) PostDeleteComment(request *dto.CommentDeleteRequest) error
 		s.logger.Error().Err(err).Msg("failed find by post_id and user_id to database")
 		return err
 	}
-	if err := s.postCache.DeleteById(request.PostId); err != nil {
-		s.logger.Error().Err(err).Msg("failed delete by id to cache")
-	}
 	if err := s.commentRepository.Delete(comment.Id); err != nil {
 		s.logger.Error().Err(err).Msg("failed delete to database")
 		return err
 	}
+	go func() {
+		timestamp := time.Now()
+		if err := s.postCache.DeleteById(request.PostId); err != nil {
+			s.logger.Error().Err(err).Msg("failed delete by id to cache")
+		}
+		data := &dto.EventProducer[dto.EventCommentDecrementProducer]{
+			Event:     pkg.BROKER_ROUTE_COMMENT_INCREMENT,
+			Timestamp: timestamp,
+			Data: dto.EventCommentDecrementProducer{
+				PostId: request.PostId,
+				Total:  1,
+			},
+		}
+		err := s.postProducer.CommentDecrement(data)
+		if err != nil {
+			s.logger.Error().Err(err).Msg("failed comment decrement to producer")
+			return
+		}
+	}()
 	s.logger.Info().Str("comment_id", strconv.Itoa(int(comment.Id))).Msg("post delete comment success")
 	return nil
 }
