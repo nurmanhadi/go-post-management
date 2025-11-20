@@ -484,7 +484,7 @@ func (s *PostService) PostDeleteComment(request *dto.CommentDeleteRequest) error
 			s.logger.Error().Err(err).Msg("failed delete by id to cache")
 		}
 		data := &dto.EventProducer[dto.EventCommentDecrementProducer]{
-			Event:     pkg.BROKER_ROUTE_COMMENT_INCREMENT,
+			Event:     pkg.BROKER_ROUTE_COMMENT_DECREMENT,
 			Timestamp: timestamp,
 			Data: dto.EventCommentDecrementProducer{
 				PostId: request.PostId,
