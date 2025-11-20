@@ -125,13 +125,9 @@ func (s *PostService) PostUpdate(id string, request *dto.PostUpdateRequest) erro
 			Event:     pkg.BROKER_ROUTE_POST_UPDATED,
 			Timestamp: timestamp,
 			Data: dto.EventPostUpdatedProducer{
-				PostId:       newId,
-				UserId:       post.UserId,
-				Description:  post.Description,
-				TotalLike:    0,
-				TotalComment: 0,
-				CreatedAt:    post.CreatedAt,
-				UpdatedAt:    timestamp,
+				PostId:      newId,
+				Description: post.Description,
+				UpdatedAt:   timestamp,
 			},
 		}
 		err := s.postProducer.PostUpdated(data)
@@ -311,17 +307,17 @@ func (s *PostService) PostLike(request *dto.LikeAddRequest) error {
 		if err := s.postCache.DeleteById(request.PostId); err != nil {
 			s.logger.Error().Err(err).Msg("failed delete by id to cache")
 		}
-		data := &dto.EventProducer[dto.EventPostLikeProducer]{
-			Event:     pkg.BROKER_ROUTE_POST_LIKE,
+		data := &dto.EventProducer[dto.EventLikeTotalProducer]{
+			Event:     pkg.BROKER_ROUTE_LIKE_TOTAL,
 			Timestamp: timestamp,
-			Data: dto.EventPostLikeProducer{
+			Data: dto.EventLikeTotalProducer{
 				PostId: request.PostId,
-				Total:  1,
+				Total:  true,
 			},
 		}
-		err := s.postProducer.PostLike(data)
+		err := s.postProducer.LikeTotal(data)
 		if err != nil {
-			s.logger.Error().Err(err).Msg("failed post Like to producer")
+			s.logger.Error().Err(err).Msg("failed Like total to producer")
 			return
 		}
 	}()
@@ -369,17 +365,17 @@ func (s *PostService) PostUnlike(request *dto.LikeDeleteRequest) error {
 		if err := s.postCache.DeleteById(request.PostId); err != nil {
 			s.logger.Error().Err(err).Msg("failed delete by id to cache")
 		}
-		data := &dto.EventProducer[dto.EventPostUnlikeProducer]{
-			Event:     pkg.BROKER_ROUTE_POST_UNLIKE,
+		data := &dto.EventProducer[dto.EventLikeTotalProducer]{
+			Event:     pkg.BROKER_ROUTE_LIKE_TOTAL,
 			Timestamp: timestamp,
-			Data: dto.EventPostUnlikeProducer{
+			Data: dto.EventLikeTotalProducer{
 				PostId: request.PostId,
-				Total:  1,
+				Total:  false,
 			},
 		}
-		err := s.postProducer.PostUnlike(data)
+		err := s.postProducer.LikeTotal(data)
 		if err != nil {
-			s.logger.Error().Err(err).Msg("failed post unlike to producer")
+			s.logger.Error().Err(err).Msg("failed Like total to producer")
 			return
 		}
 	}()
@@ -425,17 +421,17 @@ func (s *PostService) PostComment(request *dto.CommentAddRequest) error {
 		if err := s.postCache.DeleteById(request.PostId); err != nil {
 			s.logger.Error().Err(err).Msg("failed delete by id to cache")
 		}
-		data := &dto.EventProducer[dto.EventCommentIncrementProducer]{
-			Event:     pkg.BROKER_ROUTE_COMMENT_INCREMENT,
+		data := &dto.EventProducer[dto.EventCommentTotalProducer]{
+			Event:     pkg.BROKER_ROUTE_COMMENT_TOTAL,
 			Timestamp: timestamp,
-			Data: dto.EventCommentIncrementProducer{
+			Data: dto.EventCommentTotalProducer{
 				PostId: request.PostId,
-				Total:  1,
+				Total:  true,
 			},
 		}
-		err := s.postProducer.CommentIncrement(data)
+		err := s.postProducer.CommentTotal(data)
 		if err != nil {
-			s.logger.Error().Err(err).Msg("failed comment increment to producer")
+			s.logger.Error().Err(err).Msg("failed comment total to producer")
 			return
 		}
 	}()
@@ -483,17 +479,17 @@ func (s *PostService) PostDeleteComment(request *dto.CommentDeleteRequest) error
 		if err := s.postCache.DeleteById(request.PostId); err != nil {
 			s.logger.Error().Err(err).Msg("failed delete by id to cache")
 		}
-		data := &dto.EventProducer[dto.EventCommentDecrementProducer]{
-			Event:     pkg.BROKER_ROUTE_COMMENT_DECREMENT,
+		data := &dto.EventProducer[dto.EventCommentTotalProducer]{
+			Event:     pkg.BROKER_ROUTE_COMMENT_TOTAL,
 			Timestamp: timestamp,
-			Data: dto.EventCommentDecrementProducer{
+			Data: dto.EventCommentTotalProducer{
 				PostId: request.PostId,
-				Total:  1,
+				Total:  true,
 			},
 		}
-		err := s.postProducer.CommentDecrement(data)
+		err := s.postProducer.CommentTotal(data)
 		if err != nil {
-			s.logger.Error().Err(err).Msg("failed comment decrement to producer")
+			s.logger.Error().Err(err).Msg("failed comment total to producer")
 			return
 		}
 	}()
